@@ -7,33 +7,6 @@
 #include "util/lock.h"
 #include "util/log.h"
 
-// Convert window coordinates (as provided by SDL_GetMouseState() to renderer
-// coordinates (as provided in SDL mouse events)
-//
-// See my question:
-// <https://stackoverflow.com/questions/49111054/how-to-get-mouse-position-on-mouse-wheel-event>
-static void
-convert_to_renderer_coordinates(SDL_Renderer *renderer, int *x, int *y) {
-    SDL_Rect viewport;
-    float scale_x, scale_y;
-    SDL_RenderGetViewport(renderer, &viewport);
-    SDL_RenderGetScale(renderer, &scale_x, &scale_y);
-    *x = (int) (*x / scale_x) - viewport.x;
-    *y = (int) (*y / scale_y) - viewport.y;
-}
-
-static struct point
-get_mouse_point(struct screen *screen) {
-    int x;
-    int y;
-    SDL_GetMouseState(&x, &y);
-    convert_to_renderer_coordinates(screen->renderer, &x, &y);
-    return (struct point) {
-        .x = x,
-        .y = y,
-    };
-}
-
 static const int ACTION_DOWN = 1;
 static const int ACTION_UP = 1 << 1;
 
@@ -139,7 +112,7 @@ request_device_clipboard(struct controller *controller) {
 }
 
 static void
-set_device_clipboard(struct controller *controller) {
+set_device_clipboard(struct controller *controller, bool paste) {
     char *text = SDL_GetClipboardText();
     if (!text) {
         LOGW("Could not get clipboard text: %s", SDL_GetError());
@@ -154,6 +127,7 @@ set_device_clipboard(struct controller *controller) {
     struct control_msg msg;
     msg.type = CONTROL_MSG_TYPE_SET_CLIPBOARD;
     msg.set_clipboard.text = text;
+    msg.set_clipboard.paste = paste;
 
     if (!controller_push_msg(controller, &msg)) {
         SDL_free(text);
@@ -219,6 +193,18 @@ rotate_device(struct controller *controller) {
     if (!controller_push_msg(controller, &msg)) {
         LOGW("Could not request device rotation");
     }
+}
+
+static void
+rotate_client_left(struct screen *screen) {
+    unsigned new_rotation = (screen->rotation + 1) % 4;
+    screen_set_rotation(screen, new_rotation);
+}
+
+static void
+rotate_client_right(struct screen *screen) {
+    unsigned new_rotation = (screen->rotation + 3) % 4;
+    screen_set_rotation(screen, new_rotation);
 }
 
 void
@@ -335,8 +321,11 @@ input_manager_process_key(struct input_manager *im,
                 }
                 return;
             case SDLK_o:
-                if (control && cmd && !shift && down) {
-                    set_screen_power_mode(controller, SCREEN_POWER_MODE_OFF);
+                if (control && cmd && down) {
+                    enum screen_power_mode mode = shift
+                                                ? SCREEN_POWER_MODE_NORMAL
+                                                : SCREEN_POWER_MODE_OFF;
+                    set_screen_power_mode(controller, mode);
                 }
                 return;
             case SDLK_DOWN:
@@ -351,6 +340,16 @@ input_manager_process_key(struct input_manager *im,
                     action_volume_up(controller, action);
                 }
                 return;
+            case SDLK_LEFT:
+                if (cmd && !shift && down) {
+                    rotate_client_left(im->screen);
+                }
+                return;
+            case SDLK_RIGHT:
+                if (cmd && !shift && down) {
+                    rotate_client_right(im->screen);
+                }
+                return;
             case SDLK_c:
                 if (control && cmd && !shift && !repeat && down) {
                     request_device_clipboard(controller);
@@ -359,8 +358,8 @@ input_manager_process_key(struct input_manager *im,
             case SDLK_v:
                 if (control && cmd && !repeat && down) {
                     if (shift) {
-                        // store the text in the device clipboard
-                        set_device_clipboard(controller);
+                        // store the text in the device clipboard and paste
+                        set_device_clipboard(controller, true);
                     } else {
                         // inject the text as input events
                         clipboard_paste(controller);
@@ -427,8 +426,8 @@ convert_mouse_motion(const SDL_MouseMotionEvent *from, struct screen *screen,
     to->inject_touch_event.action = AMOTION_EVENT_ACTION_MOVE;
     to->inject_touch_event.pointer_id = POINTER_ID_MOUSE;
     to->inject_touch_event.position.screen_size = screen->frame_size;
-    to->inject_touch_event.position.point.x = from->x;
-    to->inject_touch_event.position.point.y = from->y;
+    to->inject_touch_event.position.point =
+        screen_convert_to_frame_coords(screen, from->x, from->y);
     to->inject_touch_event.pressure = 1.f;
     to->inject_touch_event.buttons = convert_mouse_buttons(from->state);
 
@@ -463,13 +462,19 @@ convert_touch(const SDL_TouchFingerEvent *from, struct screen *screen,
         return false;
     }
 
-    struct size frame_size = screen->frame_size;
-
     to->inject_touch_event.pointer_id = from->fingerId;
-    to->inject_touch_event.position.screen_size = frame_size;
+    to->inject_touch_event.position.screen_size = screen->frame_size;
+
+    int ww;
+    int wh;
+    SDL_GL_GetDrawableSize(screen->window, &ww, &wh);
+
     // SDL touch event coordinates are normalized in the range [0; 1]
-    to->inject_touch_event.position.point.x = from->x * frame_size.width;
-    to->inject_touch_event.position.point.y = from->y * frame_size.height;
+    int32_t x = from->x * ww;
+    int32_t y = from->y * wh;
+    to->inject_touch_event.position.point =
+        screen_convert_to_frame_coords(screen, x, y);
+
     to->inject_touch_event.pressure = from->pressure;
     to->inject_touch_event.buttons = 0;
     return true;
@@ -487,13 +492,6 @@ input_manager_process_touch(struct input_manager *im,
 }
 
 static bool
-is_outside_device_screen(struct input_manager *im, int x, int y)
-{
-    return x < 0 || x >= im->screen->frame_size.width ||
-           y < 0 || y >= im->screen->frame_size.height;
-}
-
-static bool
 convert_mouse_button(const SDL_MouseButtonEvent *from, struct screen *screen,
                      struct control_msg *to) {
     to->type = CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT;
@@ -504,8 +502,8 @@ convert_mouse_button(const SDL_MouseButtonEvent *from, struct screen *screen,
 
     to->inject_touch_event.pointer_id = POINTER_ID_MOUSE;
     to->inject_touch_event.position.screen_size = screen->frame_size;
-    to->inject_touch_event.position.point.x = from->x;
-    to->inject_touch_event.position.point.y = from->y;
+    to->inject_touch_event.position.point =
+        screen_convert_to_frame_coords(screen, from->x, from->y);
     to->inject_touch_event.pressure = 1.f;
     to->inject_touch_event.buttons =
         convert_mouse_buttons(SDL_BUTTON(from->button));
@@ -530,10 +528,15 @@ input_manager_process_mouse_button(struct input_manager *im,
             action_home(im->controller, ACTION_DOWN | ACTION_UP);
             return;
         }
+
         // double-click on black borders resize to fit the device screen
         if (event->button == SDL_BUTTON_LEFT && event->clicks == 2) {
-            bool outside =
-                is_outside_device_screen(im, event->x, event->y);
+            int32_t x = event->x;
+            int32_t y = event->y;
+            screen_hidpi_scale_coords(im->screen, &x, &y);
+            SDL_Rect *r = &im->screen->rect;
+            bool outside = x < r->x || x >= r->x + r->w
+                        || y < r->y || y >= r->y + r->h;
             if (outside) {
                 screen_resize_to_fit(im->screen);
                 return;
@@ -557,9 +560,15 @@ input_manager_process_mouse_button(struct input_manager *im,
 static bool
 convert_mouse_wheel(const SDL_MouseWheelEvent *from, struct screen *screen,
                     struct control_msg *to) {
+
+    // mouse_x and mouse_y are expressed in pixels relative to the window
+    int mouse_x;
+    int mouse_y;
+    SDL_GetMouseState(&mouse_x, &mouse_y);
+
     struct position position = {
         .screen_size = screen->frame_size,
-        .point = get_mouse_point(screen),
+        .point = screen_convert_to_frame_coords(screen, mouse_x, mouse_y),
     };
 
     to->type = CONTROL_MSG_TYPE_INJECT_SCROLL_EVENT;
