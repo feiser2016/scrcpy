@@ -1,11 +1,11 @@
-# scrcpy (v2.1)
+# scrcpy (v2.3.1)
 
 <img src="app/data/icon.svg" width="128" height="128" alt="scrcpy" align="right" />
 
 _pronounced "**scr**een **c**o**py**"_
 
 This application mirrors Android devices (video and audio) connected via
-USB or [over TCP/IP](doc/device.md#tcpip-wireless), and allows to control the
+USB or [over TCP/IP](doc/connection.md#tcpip-wireless), and allows to control the
 device with the keyboard and the mouse of the computer. It does not require any
 _root_ access. It works on _Linux_, _Windows_ and _macOS_.
 
@@ -25,12 +25,13 @@ It focuses on:
 [lowlatency]: https://github.com/Genymobile/scrcpy/pull/646
 
 Its features include:
- - [audio forwarding](doc/audio.md) (Android >= 11)
+ - [audio forwarding](doc/audio.md) (Android 11+)
  - [recording](doc/recording.md)
  - mirroring with [Android device screen off](doc/device.md#turn-screen-off)
  - [copy-paste](doc/control.md#copy-paste) in both directions
  - [configurable quality](doc/video.md)
- - Android device screen [as a webcam (V4L2)](doc/v4l2.md) (Linux-only)
+ - [camera mirroring](doc/camera.md) (Android 12+)
+ - [mirroring as a webcam (V4L2)](doc/v4l2.md) (Linux-only)
  - [physical keyboard/mouse simulation (HID)](doc/hid-otg.md)
  - [OTG mode](doc/hid-otg.md#otg)
  - and more…
@@ -68,14 +69,16 @@ mode](doc/hid-otg.md#otg).
 The application provides a lot of features and configuration options. They are
 documented in the following pages:
 
- - [Device](doc/device.md)
+ - [Connection](doc/connection.md)
  - [Video](doc/video.md)
  - [Audio](doc/audio.md)
  - [Control](doc/control.md)
+ - [Device](doc/device.md)
  - [Window](doc/window.md)
  - [Recording](doc/recording.md)
  - [Tunnels](doc/tunnels.md)
  - [HID/OTG](doc/hid-otg.md)
+ - [Camera](doc/camera.md)
  - [Video4Linux](doc/v4l2.md)
  - [Shortcuts](doc/shortcuts.md)
 
