@@ -2,41 +2,45 @@
 
 ## Install
 
+### From the official release
+
 Download the [latest release]:
 
- - [`scrcpy-win64-v2.3.1.zip`][direct-win64] (64-bit)  
-   <sub>SHA-256: `f1f78ac98214078425804e524a1bed515b9d4b8a05b78d210a4ced2b910b262d`</sub>
- - [`scrcpy-win32-v2.3.1.zip`][direct-win32] (32-bit)  
-   <sub>SHA-256: `5dffc2d432e9b8b5b0e16f12e71428c37c70d9124cfbe7620df0b41b7efe91ff`</sub>
+ - [`scrcpy-win64-v3.3.1.zip`][direct-win64] (64-bit)  
+   <sub>SHA-256: `4fcad494772a3ae5de9a133149f8856d2fc429b41795f7cf7c754e0c1bb6fbc0`</sub>
+ - [`scrcpy-win32-v3.3.1.zip`][direct-win32] (32-bit)  
+   <sub>SHA-256: `ccdf1b4f5d19dfe760446a107e55b0a010a00e097d46533a161499c9333a20a6`</sub>
 
 [latest release]: https://github.com/Genymobile/scrcpy/releases/latest
-[direct-win64]: https://github.com/Genymobile/scrcpy/releases/download/v2.3.1/scrcpy-win64-v2.3.1.zip
-[direct-win32]: https://github.com/Genymobile/scrcpy/releases/download/v2.3.1/scrcpy-win32-v2.3.1.zip
+[direct-win64]: https://github.com/Genymobile/scrcpy/releases/download/v3.3.1/scrcpy-win64-v3.3.1.zip
+[direct-win32]: https://github.com/Genymobile/scrcpy/releases/download/v3.3.1/scrcpy-win32-v3.3.1.zip
 
 and extract it.
 
-Alternatively, you could install it from packages manager, like [Winget]:
+
+### From a package manager
+
+From [WinGet] (ADB and other dependencies will be installed alongside scrcpy):
 
 ```bash
-winget install scrcpy
+winget install --exact Genymobile.scrcpy
 ```
 
-or [Chocolatey]:
+From [Chocolatey]:
 
 ```bash
 choco install scrcpy
 choco install adb    # if you don't have it yet
 ```
 
-or [Scoop]:
-
+From [Scoop]:
 
 ```bash
 scoop install scrcpy
 scoop install adb    # if you don't have it yet
 ```
 
-[Winget]: https://github.com/microsoft/winget-cli
+[WinGet]: https://github.com/microsoft/winget-cli
 [Chocolatey]: https://chocolatey.org/
 [Scoop]: https://scoop.sh
 

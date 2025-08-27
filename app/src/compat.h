@@ -8,7 +8,7 @@
 #include <libavutil/version.h>
 #include <SDL2/SDL_version.h>
 
-#ifndef __WIN32
+#ifndef _WIN32
 # define PRIu64_ PRIu64
 # define SC_PRIsizet "zu"
 #else
@@ -73,6 +73,14 @@
 
 #if SDL_VERSION_ATLEAST(2, 0, 16)
 # define SCRCPY_SDL_HAS_THREAD_PRIORITY_TIME_CRITICAL
+#endif
+
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+# define SCRCPY_SDL_HAS_HINT_APP_NAME
+#endif
+
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+# define SCRCPY_SDL_HAS_HINT_AUDIO_DEVICE_APP_NAME
 #endif
 
 #ifndef HAVE_STRDUP

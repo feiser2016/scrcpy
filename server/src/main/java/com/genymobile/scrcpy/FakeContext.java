@@ -1,11 +1,19 @@
 package com.genymobile.scrcpy;
 
+import com.genymobile.scrcpy.wrappers.ServiceManager;
+
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.AttributionSource;
+import android.content.ClipboardManager;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.ContextWrapper;
-import android.os.Build;
+import android.content.IContentProvider;
+import android.os.Binder;
 import android.os.Process;
+
+import java.lang.reflect.Field;
 
 public final class FakeContext extends ContextWrapper {
 
@@ -17,6 +25,38 @@ public final class FakeContext extends ContextWrapper {
     public static FakeContext get() {
         return INSTANCE;
     }
+
+    private final ContentResolver contentResolver = new ContentResolver(this) {
+        @SuppressWarnings({"unused", "ProtectedMemberInFinalClass"})
+        // @Override (but super-class method not visible)
+        protected IContentProvider acquireProvider(Context c, String name) {
+            return ServiceManager.getActivityManager().getContentProviderExternal(name, new Binder());
+        }
+
+        @SuppressWarnings("unused")
+        // @Override (but super-class method not visible)
+        public boolean releaseProvider(IContentProvider icp) {
+            return false;
+        }
+
+        @SuppressWarnings({"unused", "ProtectedMemberInFinalClass"})
+        // @Override (but super-class method not visible)
+        protected IContentProvider acquireUnstableProvider(Context c, String name) {
+            return null;
+        }
+
+        @SuppressWarnings("unused")
+        // @Override (but super-class method not visible)
+        public boolean releaseUnstableProvider(IContentProvider icp) {
+            return false;
+        }
+
+        @SuppressWarnings("unused")
+        // @Override (but super-class method not visible)
+        public void unstableProviderDied(IContentProvider icp) {
+            // ignore
+        }
+    };
 
     private FakeContext() {
         super(Workarounds.getSystemContext());
@@ -32,7 +72,7 @@ public final class FakeContext extends ContextWrapper {
         return PACKAGE_NAME;
     }
 
-    @TargetApi(Build.VERSION_CODES.S)
+    @TargetApi(AndroidVersions.API_31_ANDROID_12)
     @Override
     public AttributionSource getAttributionSource() {
         AttributionSource.Builder builder = new AttributionSource.Builder(Process.SHELL_UID);
@@ -49,5 +89,31 @@ public final class FakeContext extends ContextWrapper {
     @Override
     public Context getApplicationContext() {
         return this;
+    }
+
+    @Override
+    public ContentResolver getContentResolver() {
+        return contentResolver;
+    }
+
+    @SuppressLint("SoonBlockedPrivateApi")
+    @Override
+    public Object getSystemService(String name) {
+        Object service = super.getSystemService(name);
+        if (service == null) {
+            return null;
+        }
+
+        if (Context.CLIPBOARD_SERVICE.equals(name)) {
+            try {
+                Field field = ClipboardManager.class.getDeclaredField("mContext");
+                field.setAccessible(true);
+                field.set(service, this);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return service;
     }
 }
